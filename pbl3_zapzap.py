@@ -6,9 +6,16 @@ import os
 import time
 
 #Dicionario para testar em casa
-#membros_grupo = {1 : '127.0.0.1:1234', 2 : '127.0.0.1:5678', 3 : '127.0.0.1:9000', 4 : '127.0.0.1:1111'}
+membros_grupo = {1 : '127.0.0.1:1234', 2 : '127.0.0.1:5678', 3 : '127.0.0.1:9000', 4 : '127.0.0.1:1111'}
 #Dicionario com ips e portas para o lab
-membros_grupo = {1: '172.16.103.1:1111', 2: '172.16.103.2:2222', 3: '172.16.103.3:3333', 4 : '172.16.103.4:4444', 5: '172.16.103.5:5555', 6: '172.16.103.6:6666', 7: '172.16.103.7:7777', 8: '172.16.103.8:8888', 9: '172.16.103.9:9999', 10: '172.16.103.10:9899', 11: '172.16.103.11:7888', 12: '172.16.103.12:8569', 13: '172.16.103.13:9044', 14: '172.16.103.14:8944'}
+#membros_grupo = {1: '172.16.103.1:1111', 2: '172.16.103.2:2222', 3: '172.16.103.3:3333', 4 : '172.16.103.4:4444', 5: '172.16.103.5:5555', 6: '172.16.103.6:6666', 7: '172.16.103.7:7777', 8: '172.16.103.8:8888', 9: '172.16.103.9:9999', 10: '172.16.103.10:9899', 11: '172.16.103.11:7888', 12: '172.16.103.12:8569', 13: '172.16.103.13:9044', 14: '172.16.103.14:8944'}
+membros_online = {}  # Conjunto de clientes online
+heartbeat_timestamps = {}  # Dicionário para manter o timestamp dos últimos batimentos cardíacos
+msg_confirm =[]
+
+for i in membros_grupo:
+    heartbeat_timestamps[membros_grupo[i]] = 0
+
 
 mensagens_all = []
 #Contatos conhecidos (Dicionario com o endereço dos usuarios conectados) - host:porta
@@ -92,6 +99,42 @@ def sincronizar_mensagens(HOST, PORT):
         sinc_mensagem = {'type': 'sendMsgSync', 'host' : HOST, 'port' : PORT}
         enviar_socket(sinc_mensagem, HOST, PORT)
         time.sleep(5)
+
+
+
+def verif_online(HOST, PORT):
+    
+    cont = 0
+    while True:
+        exibir_membros_online()
+        verif_tick = {'type': 'sendTick', 'host' : HOST, 'port' : PORT}
+        enviar_socket(verif_tick, HOST, PORT)
+        time.sleep(0.5)
+        cont += 1
+        
+        for i in heartbeat_timestamps:
+            heartbeat_timestamps[i] += 1
+        if cont == 3:
+            for i in heartbeat_timestamps:
+                if heartbeat_timestamps[i] >= 3 and i in membros_online:
+                    membros_online.pop(i)
+            cont = 0
+            
+
+def return_tick(mensagem, HOST, PORT):
+       
+    enviar_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    
+    sinc_mensagem = {'type': 'returnTick', 'data' : "online", 'ender' : str(HOST) + ":" +  str(PORT)}
+    sinc_mensagem = json.dumps(sinc_mensagem)
+    enviar_socket.sendto(sinc_mensagem.encode(), (mensagem['host'], mensagem['port']))
+    enviar_socket.close()
+
+def gerenciar_online():
+    for i in membros_online:
+        if membros_online[i] == 3:
+            membros_online.pop(i)
+
 #Função responável por enviar as mensagens para outros usuários para que ocorra a sincronização
 def enviar_historico_sinc(mensagem):
     
@@ -141,9 +184,10 @@ def enviar_mensagem(clock, HOST, PORT):
 
         dict_mensagem.pop('type')
         historico_mensagens.append(dict_mensagem)
-        exibir_mensagens()
+        #exibir_mensagens()
+        exibir_membros_online()
 #Função responsável por realizar a triagem de todas as mensagens e solicitações recebidas
-def triagem_mensagens(clock):
+def triagem_mensagens(clock, HOST, PORT):
     while True:
         if mensagens_all:
             mensagem = mensagens_all.pop()
@@ -151,7 +195,8 @@ def triagem_mensagens(clock):
                 mensagem.pop('type')
                 clock.update(mensagem['time'])
                 historico_mensagens.append(mensagem)
-                exibir_mensagens()
+                #exibir_mensagens()
+                exibir_membros_online()
             elif mensagem['type'] == 'clockSync':
                 clock.update(mensagem['clock'])
                 sinc_mensagem = {'type': 'updateClock', 'clock': clock.value}
@@ -166,6 +211,15 @@ def triagem_mensagens(clock):
 
             elif mensagem['type'] == 'recivMsgSync':
                 receber_historico_sinc(mensagem)  
+
+            elif mensagem['type'] == 'sendTick':
+                return_tick(mensagem, HOST, PORT)
+            elif mensagem['type'] == 'returnTick':
+                if mensagem['ender'] not in membros_online:
+                    membros_online[mensagem['ender']] = 0
+                else:
+                    membros_online[mensagem['ender']] = 0
+
 #Função responsável por selecionar uma respectiva cor para casa usuário no sistema
 def select_cor(var):
     for i in membros_grupo:
@@ -173,8 +227,8 @@ def select_cor(var):
             return CORES[i - 1]
 #Função responsável por exibir as mensagens na na tela
 def exibir_mensagens():
-    #os.system('cls') #windowns
-    os.system('clear') #linux
+    os.system('cls') #windowns
+    #os.system('clear') #linux
     print('''
     -=-=-=-=-=-=--=--=-=-
             ZAPZAP
@@ -188,6 +242,25 @@ def exibir_mensagens():
             print(cor + i['remetente'], ' - ', mensagem + '\033[97m')
         except:
             print(i['remetente'], ' - ', mensagem)
+
+
+def exibir_membros_online():
+    os.system('cls') #windowns
+    #os.system('clear') #linux
+    print('''
+    -=-=-=-=-=-=--=--=-=-
+            ZAPZAP
+    -=-=-=-=-=-=--=--=-=-
+''')
+    for i in membros_online:
+
+        try:
+            print(i + '\033[97m')
+        except:
+            print(i)
+
+
+
 #Função responsável por gerar um ID único para idenificação das mensagens
 def gerar_id(): 
     return str(uuid.uuid4())
@@ -200,23 +273,29 @@ def main():
             recv_socket.bind((HOST, PORT))
             break
         except:
+            
             continue
     clock = LamportClock() #Criando o objeto do relógio
     #Thread para receber as mensagens a todo momento
     thread_receber = threading.Thread(target=receber_mensagens, args=(recv_socket,))
     thread_receber.start()
     #Thread para realizar a triagem das mensagens recebidas
-    thread_triagem = threading.Thread(target=triagem_mensagens, args=(clock,))
+    thread_triagem = threading.Thread(target=triagem_mensagens, args=(clock,HOST, PORT))
     thread_triagem.start()
     #Thread para realizar a sincronização periodica das mensagens
-    thread_sinc = threading.Thread(target=sincronizar_mensagens, args=(HOST, PORT,))
-    thread_sinc.start()
-
+    #thread_sinc = threading.Thread(target=sincronizar_mensagens, args=(HOST, PORT,))
+    #thread_sinc.start()
+    #Thread para verificar membros que estão online
+    thread_online = threading.Thread(target=verif_online, args=(HOST, PORT,))
+    thread_online.start()
     sincronizar_relogio(clock, HOST, PORT) #Chamada da função de sincronização do relógio
-    exibir_mensagens() #Chamada da função de exibição das mensagens
+    #exibir_mensagens() #Chamada da função de exibição das mensagens
+    exibir_membros_online()
+    #while True:
+        #enviar_mensagem(clock, HOST, PORT) #Chamada do envio das mensagens
 
-    while True:
-        enviar_mensagem(clock, HOST, PORT) #Chamada do envio das mensagens
+
+
 
 if __name__ == "__main__":
     main()
