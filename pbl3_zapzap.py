@@ -6,15 +6,16 @@ import os
 import time
 import copy
 import platform
+import sys
 
 LIMPAR_WIN = "cls"
 LIMPAR_LINUX = "clear"
 LIMPAR = LIMPAR_LINUX if platform.system() == "Linux" else LIMPAR_WIN
 
 #Dicionario para testar em casa
-membros_grupo = {1 : '127.0.0.1:1234', 2 : '127.0.0.1:5678', 3 : '127.0.0.1:9000', 4 : '127.0.0.1:1111'}
+#membros_grupo = {1 : '127.0.0.1:1234', 2 : '127.0.0.1:5678', 3 : '127.0.0.1:9000', 4 : '127.0.0.1:1111'}
 #Dicionario com ips e portas para o lab
-#membros_grupo = {1: '172.16.103.1:1111', 2: '172.16.103.2:2222', 3: '172.16.103.3:3333', 4 : '172.16.103.4:4444', 5: '172.16.103.5:5555', 6: '172.16.103.6:6666', 7: '172.16.103.7:7777', 8: '172.16.103.8:8888', 9: '172.16.103.9:9999', 10: '172.16.103.10:9899', 11: '172.16.103.11:7888', 12: '172.16.103.12:8569', 13: '172.16.103.13:9044', 14: '172.16.103.14:8944'}
+membros_grupo = {1: '172.16.103.1:1111', 2: '172.16.103.2:2222', 3: '172.16.103.3:3333', 4 : '172.16.103.4:4444', 5: '172.16.103.5:5555', 6: '172.16.103.6:6666', 7: '172.16.103.7:7777', 8: '172.16.103.8:8888', 9: '172.16.103.9:9999', 10: '172.16.103.10:9899', 11: '172.16.103.11:7888', 12: '172.16.103.12:8569', 13: '172.16.103.13:9044', 14: '172.16.103.14:8944'}
 membros_online = {}  # Conjunto de clientes online
 heartbeat_timestamps = {}  # Dicionário para manter o timestamp dos últimos batimentos cardíacos
 msg_confirm =[]
@@ -24,9 +25,9 @@ save_indices = []
 cont_indice_ciclos = []
 recoverTemp = []
 indiceTemp = []
-
+repeatRecover = True
 tempoPedido = None
-
+pacote_recebido = False
 for i in membros_grupo:
     heartbeat_timestamps[membros_grupo[i]] = 0
 
@@ -99,7 +100,7 @@ def env_mt(HOST, PORT, clock):
                     historico_temporario[dict_mensagem['id']] = dict_mensagem
                                 
 
-                time.sleep(0.3)
+                time.sleep(0.5)
             
             print("Mensagens do arquivo enviadas.")
 
@@ -255,6 +256,7 @@ def atualiza_historico(historico_mensagens ,HOST, PORT):
                     historico_temporario.pop(item)
 
         autorizacao_env.clear() , autorizacao_rcv.clear() , lixeira.clear()
+        time.sleep(0.2)
 envios_recover = []
 def recuperar_mensagens(HOST, PORT):
     pedido = {'type' : 'recoverMSG', 'remetente' : str(HOST) + ':' + str(PORT)}
@@ -293,6 +295,9 @@ def enviar_mensagem(clock, HOST, PORT):
             env_mt(HOST, PORT, clock)
         if mensagem == 'update00':
             exibir_mensagens()
+        if mensagem == 'recuperar00':
+            
+            recuperar_mensagens(HOST, PORT)
         clock.increment()
         id = gerar_id()
         #mensagem = criptografar(mensagem)
@@ -314,6 +319,7 @@ def enviar_mensagem(clock, HOST, PORT):
    
 #Função responsável por realizar a triagem de todas as mensagens e solicitações recebidas
 def triagem_mensagens(clock, HOST, PORT, recoverInAuto, historico_mensagens, save_indices):
+    tempoPedido = None
     while True:
         if mensagens_all:
             mensagem = mensagens_all.pop()
@@ -360,6 +366,7 @@ def triagem_mensagens(clock, HOST, PORT, recoverInAuto, historico_mensagens, sav
                         historico_temporario[mensagem['id']]['exibir'] = True
             elif mensagem['type'] == 'recoverMSG':
                 ender = mensagem['remetente'].split(':')
+                print(mensagem['remetente'])
                 returnPedido = {'type' : 'returnPedido','host' : HOST, 'port' : PORT}
 
                 mensagem_encode = json.dumps(returnPedido)
@@ -392,22 +399,30 @@ def triagem_mensagens(clock, HOST, PORT, recoverInAuto, historico_mensagens, sav
                     enviar_socket.sendto(mensagem_encode.encode(), (mensagem['host'], int(mensagem['port'])))
                     enviar_socket.close()
             elif mensagem['type'] == 'update_idices':
-                
-                save_indices += mensagem['indices']
-                cont_indice_ciclos.append(mensagem['indice_atual'])
-                if mensagem['indice_atual'] == 1:
-                    tempoPedido = time.time()
-                elif tempoPedido != None:
-                    if tempoPedido - time.time() > 10:
-                        #finalizar programa
-                        print('\n-=-=-RECUPERANDO MENSAGENS, POR FAVOR AGUARDE...-=-=-\n')
-                        recoverInAuto = False
-                        save_indices.clear()
-                        cont_indice_ciclos.clear()
-                        recoverTemp.clear()
-                        indiceTemp.clear()
-                        recuperar_mensagens(HOST, PORT)
-                        
+                try:
+                    save_indices += mensagem['indices']
+                    cont_indice_ciclos.append(mensagem['indice_atual'])
+                    if mensagem['indice_atual'] == 1:
+                        tempoPedido = time.time()
+                    elif tempoPedido != None:
+                        #print('\n-=-=-  AQUIIII...-=-=-\n')
+                        #time.sleep(3)
+                        if tempoPedido - time.time() > 10:
+                            #finalizar programa
+                            print('\n-=-=-RECUPERANDO MENSAGENS, POR FAVOR AGUARDE...-=-=-\n')
+                            #time.sleep(3)
+                            #sys.exit()
+                            recoverInAuto = False
+                            tempoPedido = None
+                            save_indices.clear()
+                            cont_indice_ciclos.clear()
+                            recoverTemp.clear()
+                            indiceTemp.clear()
+                            recuperar_mensagens(HOST, PORT)
+                except Exception as e:
+                    print(e)
+                    print("ERROOOOOOO!!!")
+                    time.sleep(10)
                 
                 if cont_indice_ciclos[-1] == mensagem['total_indices']:
                     if len(cont_indice_ciclos) == mensagem['total_indices']:
@@ -429,15 +444,21 @@ def triagem_mensagens(clock, HOST, PORT, recoverInAuto, historico_mensagens, sav
                     enviar_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     enviar_socket.sendto(mensagem_encode.encode(), (mensagem['host'], mensagem['port']))
                     enviar_socket.close()
+                    time.sleep(0.1)
             elif mensagem['type'] == 'envio_recoverMSG':
                 recoverTemp.append(mensagem['msg'])
                 indiceTemp.append(mensagem['msg']['id'])
 
                 if recoverTemp.copy()[-1]['id'] == mensagem['indice_final']:
                     if set(indiceTemp) == set(save_indices): 
-                        historico_mensagens += recoverTemp
+                        for i in recoverTemp:
+                            if i not in historico_mensagens:
+                                historico_mensagens.append(i)
+                       
                     else:
                         print('\n-=-=-RECUPERANDO MENSAGENS, POR FAVOR AGUARDE...-=-=-\n')
+                        #time.sleep(3)
+                        #sys.exit()
                         recoverInAuto = False
                         save_indices.clear()
                         cont_indice_ciclos.clear()
@@ -506,18 +527,23 @@ def main():
     clock = LamportClock() #Criando o objeto do relógio
     #Thread para receber as mensagens a todo momento
     thread_receber = threading.Thread(target=receber_mensagens, args=(recv_socket,))
+    thread_receber.daemon = True
     thread_receber.start()
     #Thread para realizar a triagem das mensagens recebidas
-    thread_triagem = threading.Thread(target=triagem_mensagens, args=(clock,HOST, PORT, recoverInAuto, historico_mensagens, save_indices))
+    thread_triagem = threading.Thread(target=triagem_mensagens, args=(clock,HOST, PORT, recoverInAuto, historico_mensagens, save_indices,))
+    thread_triagem.daemon = True
     thread_triagem.start()
 
 
     #Thread para verificar membros que estão online
     thread_online = threading.Thread(target=verif_online, args=(HOST, PORT, ))
+    thread_online.daemon = True
     thread_online.start()
 
+    
     recuperar_mensagens(HOST, PORT)
     thread_atualizaHistorico = threading.Thread(target=atualiza_historico, args=(historico_mensagens, HOST, PORT,))
+    thread_atualizaHistorico.daemon = True
     thread_atualizaHistorico.start()
 
 

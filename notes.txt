@@ -1,8 +1,0 @@
-Envio pros online E PRECISO SALVAR PARA QUEM EU ENVIEI 
-espero confirmação
-mando o pode printar meu chapa
-
-Fluxo de envio de msg: 
-enviei o pacote : msg = {'time' : "", 'type' : 'msg', 'conteudo' : "", 'user' : "", 'id' : }
-guardo no histórico temporario: {'pacote' : , 'enviou pra quem pvt?': [], 'enviou ou enviado?', tempo da mensagem} (salvo o quem enviou apenas para em quem enviou)
-se enviou espera confirmação e se recebeu vc confirma, uma thread para isso
