@@ -106,7 +106,7 @@ Uma vez selecionado o computador, torna-se possível enviar mensagens para outro
 
 Devido ao método de confirmação e confiabilidade de mensagens utilizado, as mensagens só são exibidas caso todos os usuários online a recebam, garantindo que todos estejam sempre visualizando as mesmas mensagens.
 
-Vale ressaltar que visando a portabilidade do programa ele também foi adicionado no docker. Podendo ser baixado via terminal utilizando o comando: "docker pull bast0z/pbl3zapzap" e após ser baixado pode ser executado via docker com o comando: "docker run -it --network host bast0z/pbl3zapzap".
+Vale ressaltar que visando a portabilidade do programa ele também foi adicionado no docker. Podendo ser baixado via terminal utilizando o comando: "docker pull bast0z/pbl3zapzap:1" e após ser baixado pode ser executado via docker com o comando: "docker run -it --network host bast0z/pbl3zapzap:1".
 
 # 4 Conclusão
 
